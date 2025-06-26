@@ -28,7 +28,7 @@ struct gymsocialApp: App {
                     LoginView()
                 } else {
                     MainTabView()
-                        .environmentObject(session)
+                      .environmentObject(session)
                 }
             }
         }

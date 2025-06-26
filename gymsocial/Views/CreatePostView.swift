@@ -7,8 +7,10 @@
 
 
 import SwiftUI
+import FirebaseFirestore
 
 struct CreatePostView: View {
+    @EnvironmentObject var session: SessionViewModel
     @State private var postText = ""
     @State private var isPosting = false
 
@@ -42,11 +44,24 @@ struct CreatePostView: View {
     }
 
     private func submitPost() {
+        guard let user = session.currentUser else { return }
         isPosting = true
-        // TODO: call DatabaseService to save postText
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            isPosting = false
-            postText = ""
+        DatabaseService.shared.createPost(
+            contentText: postText,
+            imageURL: nil,
+            author: user
+        ) { result in
+            DispatchQueue.main.async {
+                isPosting = false
+                switch result {
+                case .success():
+                    postText = ""
+                case .failure(let error):
+                    print("Error creating post:", error)
+                    // Optionally show an alert here
+                }
+            }
         }
     }
+
 }

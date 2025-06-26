@@ -73,53 +73,52 @@ final class AuthService {
     //
     
     func login(
-        email: String,
-        password: String,
-        completion: @escaping (Result<User, AuthError>) -> Void
-    ){
-        //Sign in through Firebase Auth
-        Auth.auth().signIn(withEmail: email, password: password) {result, error in
-            if let _ = error {
-                completion(.failure(.invalidCredentials))
-                return
-            }
-            
-            guard let firebaseUser = result?.user else {
-                completion(.failure(.unknownError))
-                return
-            }
-            
-            //Fetch the user document from Firestore
-            let db = Firestore.firestore()
-            let docRef = db.collection("users").document(firebaseUser.uid)
-            docRef.getDocument {snapshot, error in
-                if let _ = error {
-                    completion(.failure(.unknownError))
+            email: String,
+            password: String,
+            completion: @escaping (Result<User, AuthError>) -> Void
+        ) {
+            Auth.auth().signIn(withEmail: email, password: password) { result, error in
+                // 1) FirebaseAuth error
+                if let err = error as NSError? {
+                    print("[Auth] signIn error: \(err.localizedDescription) code: \(err.code)")
+                    completion(.failure(.invalidCredentials))
+                    return
                 }
-                
-                //ensure the document exists and snapshot.data is a dictionary
-                guard let snap = snapshot, snap.exists, let data = snap.data() else {
+                // 2) Missing Firebase user?
+                guard let firebaseUser = result?.user else {
+                    print("[Auth] no user returned from signIn, result: \(String(describing: result))")
                     completion(.failure(.unknownError))
                     return
                 }
-                
-                //Manually extract fields from that dictionary
-                let id = snap.documentID
-                let displayName = data["displayName"] as? String ?? ""
-                let email = data["email"] as? String ?? ""
-                let photoURL = data["profilePhotoURL"] as? String
-                
-                let user = User(
-                    id: id,
-                    displayName: displayName,
-                    email: email,
-                    profilePhotoURL: photoURL
-                )
-                
-                completion(.success(user))
+                // 3) Fetch Firestore profile
+                let docRef = Firestore.firestore().collection("users").document(firebaseUser.uid)
+                docRef.getDocument { snapshot, error in
+                    if let err = error {
+                        print("[Auth] Firestore getUser error: \(err.localizedDescription)")
+                        completion(.failure(.unknownError))
+                        return
+                    }
+                    // Debug logging
+                    print("[Auth] getUser snapshot exists? → \(snapshot?.exists ?? false)")
+                    print("[Auth] getUser document path → \(docRef.path)")
+                    print("[Auth] getUser raw snapshot data → \(String(describing: snapshot?.data()))")
+
+                    guard let snap = snapshot, snap.exists, let data = snap.data() else {
+                        print("[Auth] user document missing or malformed; data: \(String(describing: snapshot?.data()))")
+                        completion(.failure(.unknownError))
+                        return
+                    }
+                    // Decode fields
+                    let id = snap.documentID
+                    let displayName = data["displayName"] as? String ?? ""
+                    let email = data["email"] as? String ?? ""
+                    let photoURL = data["profilePhotoURL"] as? String
+                    let user = User(id: id, displayName: displayName, email: email, profilePhotoURL: photoURL)
+                    completion(.success(user))
+                }
             }
         }
-    }
+
     
     //
     // Sign Out Current User

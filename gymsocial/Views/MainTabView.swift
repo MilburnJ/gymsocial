@@ -1,37 +1,50 @@
-//
-//  MainTabView.swift
-//  gymsocial
-//
-//  Created by Jakeb Milburn on 6/25/25.
-//
-
-
 import SwiftUI
 
 struct MainTabView: View {
+    // your existing session view model
+    @EnvironmentObject var session: SessionViewModel
+
+    // create one WorkoutSessionViewModel for the entire workout flow
+    @StateObject private var workoutVM = WorkoutSessionViewModel()
+
     var body: some View {
         TabView {
-            FeedView()
-                .tabItem {
-                    Label("Feed", systemImage: "house")
-                }
+            // Feed tab
+            NavigationStack {
+                FeedView()
+            }
+            .tabItem {
+                Label("Feed", systemImage: "house")
+            }
 
-            CreatePostView()
-                .tabItem {
-                    Label("New Post", systemImage: "plus.square")
-                }
+            // New Post tab
+            NavigationStack {
+                CreatePostView()
+            }
+            .environmentObject(session)
+            .tabItem {
+                Label("New Post", systemImage: "plus.square")
+            }
 
-            ProfileView()
-                .tabItem {
-                    Label("Profile", systemImage: "person.circle")
-                }
+            // Workout tab — inject the workoutVM here
+            NavigationStack {
+                WorkoutSessionView()
+            }
+            .environmentObject(workoutVM)
+            .tabItem {
+                Label("Workout", systemImage: "play.circle")
+            }
+
+            // Profile tab
+            NavigationStack {
+                ProfileView()
+            }
+            .environmentObject(session)
+            .tabItem {
+                Label("Profile", systemImage: "person.circle")
+            }
         }
-    }
-}
-
-struct MainTabView_Previews: PreviewProvider {
-    static var previews: some View {
-        MainTabView()
-            .environmentObject(SessionViewModel())
+        // make sure session is available everywhere
+        .environmentObject(session)
     }
 }

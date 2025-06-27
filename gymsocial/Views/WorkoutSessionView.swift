@@ -1,50 +1,109 @@
 import SwiftUI
 
-struct WorkoutSessionView: View {
-    @StateObject private var vm = WorkoutSessionViewModel()
+// Helper for each completed exercise row
+private struct CompletedExerciseRow: View {
+    let log: ExerciseLog
 
     var body: some View {
-        VStack {
-            // Live timer display
-            Text(vm.elapsed.formatted(.time(pattern: "HH:mm:ss")))
-                .font(.largeTitle).bold()
-                .padding()
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(log.name)
+                    .font(.headline)
+                Text(log.summary)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            Spacer()
+        }
+        .padding(.vertical, 4)
+    }
+}
 
-            List {
-                ForEach($vm.draft.exercises) { $exercise in
-                    Section(header: Text(exercise.name)) {
-                        ForEach($exercise.sets) { $set in
-                            HStack {
-                                // Reps stepper
-                                Stepper("\(set.reps) reps", value: $set.reps, in: 1...50)
-                                Spacer()
-                                // Weight slider
-                                WeightSlider(weight: $set.weight)
+// Extend ExerciseLog to provide a “5x135, 5x140” style summary
+private extension ExerciseLog {
+    var summary: String {
+        sets
+            .map { "\($0.reps)x\($0.weight)" }
+            .joined(separator: ", ")
+    }
+}
+
+struct WorkoutSessionView: View {
+    @StateObject private var vm = WorkoutSessionViewModel()
+    @EnvironmentObject var session: SessionViewModel
+
+    // Format elapsed seconds as HH:mm:ss
+    private var elapsedText: String {
+        Duration.seconds(vm.elapsed)
+            .formatted(.time(pattern: .hourMinuteSecond))
+    }
+
+    var body: some View {
+        VStack(spacing: 16) {
+            // 1) Timer
+            Text(elapsedText)
+                .font(.largeTitle).bold()
+                .padding(.top)
+
+            // 2) Muscle-group carousel → navigates to SelectExerciseView
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(MuscleGroup.allCases) { group in
+                        NavigationLink {
+                            SelectExerciseView(muscleGroup: group)
+                                .environmentObject(vm)
+                        } label: {
+                            VStack {
+                                Image(systemName: group.sfSymbolName)
+                                    .font(.title2)
+                                Text(group.displayName)
+                                    .font(.caption)
                             }
-                        }
-                        Button("Add Set") {
-                            let last = exercise.sets.last!
-                            exercise.sets.append(
-                                WorkoutSet(reps: last.reps, weight: last.weight)
-                            )
+                            .padding(8)
+                            .background(Color.secondary.opacity(0.1))
+                            .cornerRadius(8)
                         }
                     }
                 }
+                .padding(.horizontal)
             }
 
-            // Finish & post button
-            Button("Finish Workout & Post") {
-                vm.finishAndPost { _ in
-                    // You can navigate back or reset the session here
+            // 3) Completed Exercises
+            if vm.draft.exercises.isEmpty {
+                Text("No exercises logged yet")
+                    .foregroundColor(.secondary)
+                    .italic()
+            } else {
+                List {
+                    ForEach(vm.draft.exercises) { log in
+                        CompletedExerciseRow(log: log)
+                    }
                 }
+                .listStyle(PlainListStyle())
+                .frame(maxHeight: 200) // adjust as you like
             }
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(Color.green)
-            .foregroundColor(.white)
-            .cornerRadius(8)
+
+            Spacer()
+
+            // 4) Finish Workout & Post
+            Button("Finish Workout & Post") {
+                vm.finishAndPost { _ in /* handle success */ }
+            }
+            .buttonStyle(.borderedProminent)
             .padding(.horizontal)
+            .padding(.bottom, 8)
         }
-        .navigationTitle("Workout Session")
+        .navigationTitle("Workout")
     }
 }
+
+#if DEBUG
+struct WorkoutSessionView_Previews: PreviewProvider {
+    static var previews: some View {
+        NavigationStack {
+            WorkoutSessionView()
+                .environmentObject(SessionViewModel())
+        }
+    }
+}
+#endif

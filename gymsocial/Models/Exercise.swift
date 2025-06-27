@@ -1,6 +1,18 @@
+//
+//  Exercise.swift
+//  gymsocial
+//
+//  Created by Jakeb Milburn on 6/26/25.
+//
+
+
 import Foundation
 
-struct Exercise: Identifiable, Codable {
+// Models/Exercise.swift
+
+import Foundation
+
+struct Exercise: Identifiable, Codable, Equatable {
     let id = UUID()
     let name: String
     let muscleGroup: MuscleGroup

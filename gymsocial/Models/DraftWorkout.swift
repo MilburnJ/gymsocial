@@ -1,3 +1,11 @@
+//
+//  DraftWorkout.swift
+//  gymsocial
+//
+//  Created by Jakeb Milburn on 6/26/25.
+//
+
+
 import Foundation
 
 /// A workout in progress, with live timer, until posted

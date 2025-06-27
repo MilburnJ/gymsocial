@@ -1,46 +1,48 @@
-//
-//  LoginView.swift
-//  gymsocial
-//
-//  Created by Jakeb Milburn on 6/5/25.
-//
+// Views/LoginView.swift
 
 import SwiftUI
 
 struct LoginView: View {
-    @State private var email = ""
-    @State private var password = ""
-    @State private var isLoading = false
-    @State private var errorMsg = ""
     @EnvironmentObject var session: SessionViewModel
-    
+    @State private var email       = ""
+    @State private var password    = ""
+    @State private var isLoading   = false
+    @State private var errorText: String?
+
     var body: some View {
-        NavigationView{
+        NavigationView {
             VStack(spacing: 20) {
-                Text("Login").font(.largeTitle).bold()
-                
+                // Email field
                 TextField("Email", text: $email)
                     .keyboardType(.emailAddress)
                     .autocapitalization(.none)
                     .disableAutocorrection(true)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                
+                    .padding()
+                    .background(Color(UIColor.secondarySystemBackground))
+                    .cornerRadius(8)
+
+                // Password field
                 SecureField("Password", text: $password)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
-                
-                if !errorMsg.isEmpty {
-                    Text(errorMsg)
+                    .padding()
+                    .background(Color(UIColor.secondarySystemBackground))
+                    .cornerRadius(8)
+
+                // Error message
+                if let error = errorText {
+                    Text(error)
                         .foregroundColor(.red)
-                        .font(.caption)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
                 }
-                
-                Button(action: {
-                    loginUser()
-                }) {
+
+                // Login button
+                Button(action: login) {
                     if isLoading {
                         ProgressView()
+                            .frame(maxWidth: .infinity)
+                            .padding()
                     } else {
-                        Text("Sign In")
+                        Text("Log In")
                             .frame(maxWidth: .infinity)
                             .padding()
                             .background(Color.blue)
@@ -49,31 +51,54 @@ struct LoginView: View {
                     }
                 }
                 .disabled(isLoading || email.isEmpty || password.isEmpty)
+
+                // Register link
+                HStack {
+                    Text("Don't have an account?")
+                        .foregroundColor(.secondary)
+                    NavigationLink("Register") {
+                        RegisterView()
+                    }
+                }
                 .padding(.top, 10)
-                
-                NavigationLink("Create an Account", destination: RegisterView())
-                    .padding(.top, 20)
-                
+
                 Spacer()
             }
             .padding()
+            .navigationTitle("Login")
         }
     }
-    
-    private func loginUser(){
+
+    private func login() {
         isLoading = true
-        errorMsg = ""
-        AuthService.shared.login(email: email, password: password) {result in
+        errorText = nil
+
+        AuthService.shared.login(email: email, password: password) { result in
             DispatchQueue.main.async {
                 isLoading = false
                 switch result {
                 case .success(let user):
-                    //SessionViewModel listener will catch this change and switch screens
-                    print("Logged in as \(user.displayName)")
+                    session.currentUser = user
                 case .failure(let error):
-                    errorMsg = "Login failed \(error)"
+                    switch error {
+                    case .invalidCredentials:
+                        errorText = "Invalid email or password."
+                    default:
+                        errorText = "An unexpected error occurred."
+                    }
                 }
             }
         }
     }
 }
+
+#if DEBUG
+struct LoginView_Previews: PreviewProvider {
+    static var previews: some View {
+        NavigationStack {
+            LoginView()
+                .environmentObject(SessionViewModel())
+        }
+    }
+}
+#endif

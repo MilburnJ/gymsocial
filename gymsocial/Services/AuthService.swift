@@ -1,135 +1,121 @@
-//
-//  AuthService.swift
-//  gymsocial
-//
-//  Created by Jakeb Milburn on 6/5/25.
-//
+// Services/AuthService.swift
 
 import Foundation
 import FirebaseAuth
 import FirebaseFirestore
 
-//simple enum for auth related errors
 enum AuthError: Error {
+    case emailAlreadyInUse
     case invalidCredentials
     case unknownError
 }
 
-//Service that wraps firebase Auth + Firestore Calls
 final class AuthService {
     static let shared = AuthService()
-    private init() { }
-    
-    //
-    //Register New User
-    //
-    
+    private init() {}
+
+    /// Sign up and return your Firestore-backed User model
     func signUp(
         email: String,
         password: String,
         displayName: String,
         completion: @escaping (Result<User, AuthError>) -> Void
-    ){
-        Auth.auth().createUser(withEmail: email, password: password) {result, error in
-            //if theres any eror creating the Auth user, map to invalidCredentials
-            if let _ = error {
-                completion(.failure(.invalidCredentials))
+    ) {
+        Auth.auth().createUser(withEmail: email, password: password) { result, error in
+            // 1) FirebaseAuth errors
+            if let err = error as NSError? {
+                switch AuthErrorCode(rawValue: err.code) {
+                case .emailAlreadyInUse:
+                    completion(.failure(.emailAlreadyInUse))
+                case .weakPassword:
+                    completion(.failure(.invalidCredentials))
+                default:
+                    completion(.failure(.invalidCredentials))
+                }
                 return
             }
-            //Ensure we get a valid FireBaseAuth user
-            guard let firebaseUser = result?.user else {
+
+            guard let fbUser = result?.user else {
                 completion(.failure(.unknownError))
                 return
             }
-            //Build a plain Swift 'user' struct
-            let newUser = User(
-                id: firebaseUser.uid,
-                displayName: displayName,
-                email: firebaseUser.email ?? "",
-                profilePhotoURL: nil
-            )
-            //Create a dictionary for Firestore with the fields we want
-            let userData: [String: Any] = [
-                "displayName": newUser.displayName,
-                "email": newUser.email,
-                "profilePhotoURL": newUser.profilePhotoURL as Any
-            ]
-            //Write that dictionary into Firestore under user/{uid}
-            let db = Firestore.firestore()
-            db.collection("users")
-                .document(newUser.id)
-                .setData(userData) {error in
+
+            // 2) Set Auth displayName
+            let changeRequest = fbUser.createProfileChangeRequest()
+            changeRequest.displayName = displayName
+            changeRequest.commitChanges { _ in
+                // ignore errors here—Firestore is our source of truth
+                // 3) Write Firestore user doc
+                let data: [String: Any] = [
+                    "displayName": displayName,
+                    "email": email
+                ]
+                Firestore.firestore()
+                    .collection("users")
+                    .document(fbUser.uid)
+                    .setData(data) { error in
+                        if let _ = error {
+                            completion(.failure(.unknownError))
+                        } else {
+                            // 4) Return your User model
+                            let user = User(
+                                id: fbUser.uid,
+                                displayName: displayName,
+                                email: email,
+                                profilePhotoURL: nil
+                            )
+                            completion(.success(user))
+                        }
+                    }
+            }
+        }
+    }
+
+    /// Log in and return your Firestore-backed User model
+    func login(
+        email: String,
+        password: String,
+        completion: @escaping (Result<User, AuthError>) -> Void
+    ) {
+        Auth.auth().signIn(withEmail: email, password: password) { result, error in
+            if let err = error as NSError? {
+                completion(.failure(.invalidCredentials))
+                return
+            }
+            guard let fbUser = result?.user else {
+                completion(.failure(.unknownError))
+                return
+            }
+            // Fetch Firestore user profile
+            Firestore.firestore()
+                .collection("users")
+                .document(fbUser.uid)
+                .getDocument { snap, error in
                     if let _ = error {
                         completion(.failure(.unknownError))
-                    } else {
-                        completion(.success(newUser))
+                        return
                     }
+                    guard
+                        let d = snap?.data(),
+                        let name = d["displayName"] as? String,
+                        let email = d["email"] as? String
+                    else {
+                        completion(.failure(.unknownError))
+                        return
+                    }
+                    let user = User(
+                        id: fbUser.uid,
+                        displayName: name,
+                        email: email,
+                        profilePhotoURL: nil
+                    )
+                    completion(.success(user))
                 }
         }
     }
-    
-    //
-    // Login Existing User
-    //
-    
-    func login(
-            email: String,
-            password: String,
-            completion: @escaping (Result<User, AuthError>) -> Void
-        ) {
-            Auth.auth().signIn(withEmail: email, password: password) { result, error in
-                // 1) FirebaseAuth error
-                if let err = error as NSError? {
-                    print("[Auth] signIn error: \(err.localizedDescription) code: \(err.code)")
-                    completion(.failure(.invalidCredentials))
-                    return
-                }
-                // 2) Missing Firebase user?
-                guard let firebaseUser = result?.user else {
-                    print("[Auth] no user returned from signIn, result: \(String(describing: result))")
-                    completion(.failure(.unknownError))
-                    return
-                }
-                // 3) Fetch Firestore profile
-                let docRef = Firestore.firestore().collection("users").document(firebaseUser.uid)
-                docRef.getDocument { snapshot, error in
-                    if let err = error {
-                        print("[Auth] Firestore getUser error: \(err.localizedDescription)")
-                        completion(.failure(.unknownError))
-                        return
-                    }
-                    // Debug logging
-                    print("[Auth] getUser snapshot exists? → \(snapshot?.exists ?? false)")
-                    print("[Auth] getUser document path → \(docRef.path)")
-                    print("[Auth] getUser raw snapshot data → \(String(describing: snapshot?.data()))")
 
-                    guard let snap = snapshot, snap.exists, let data = snap.data() else {
-                        print("[Auth] user document missing or malformed; data: \(String(describing: snapshot?.data()))")
-                        completion(.failure(.unknownError))
-                        return
-                    }
-                    // Decode fields
-                    let id = snap.documentID
-                    let displayName = data["displayName"] as? String ?? ""
-                    let email = data["email"] as? String ?? ""
-                    let photoURL = data["profilePhotoURL"] as? String
-                    let user = User(id: id, displayName: displayName, email: email, profilePhotoURL: photoURL)
-                    completion(.success(user))
-                }
-            }
-        }
-
-    
-    //
-    // Sign Out Current User
-    //
-    
-    func signOut(completion: @escaping (Result<Void, AuthError>) -> Void) {
-        do {
-            try Auth.auth().signOut()
-            completion(.success(()))
-        } catch {
-            completion(.failure(.unknownError))
-        }
+    /// Synchronous sign‐out
+    func signOut() throws {
+        try Auth.auth().signOut()
     }
 }

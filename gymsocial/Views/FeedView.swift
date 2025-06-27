@@ -1,33 +1,53 @@
-//
-//  FeedView.swift
-//  gymsocial
-//
-//  Created by Jakeb Milburn on 6/25/25.
-//
-
+// Views/FeedView.swift
 
 import SwiftUI
 
 struct FeedView: View {
-    @StateObject private var viewModel = FeedViewModel()
+    @StateObject private var vm = FeedViewModel()
 
     var body: some View {
         NavigationView {
-            List(viewModel.posts) { post in
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(post.authorName)
-                        .font(.headline)
-                    if let content = post.contentText {
-                        Text(content)
-                            .font(.body)
+            ScrollView {
+                LazyVStack(spacing: 16) {
+                    ForEach(vm.posts) { post in
+                        NavigationLink(destination: WorkoutDetailView(workout: post.workout)) {
+                            WorkoutRow(post: post)
+                        }
+                        .buttonStyle(PlainButtonStyle())
                     }
-                    Text(post.timestamp, style: .date)
-                        .font(.caption)
-                        .foregroundColor(.gray)
                 }
-                .padding(.vertical, 8)
+                .padding()
             }
             .navigationTitle("Feed")
+            .refreshable {
+                vm.reload()
+            }
         }
     }
 }
+
+private struct WorkoutRow: View {
+    let post: Post
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("\(post.authorName) logged a workout")
+                .font(.headline)
+            Text(post.workout.summary)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+        }
+        .padding()
+        .background(Color(UIColor.systemBackground))
+        .cornerRadius(8)
+        .shadow(color: Color.black.opacity(0.05), radius: 2)
+    }
+}
+
+#if DEBUG
+struct FeedView_Previews: PreviewProvider {
+    static var previews: some View {
+        FeedView()
+    }
+}
+#endif

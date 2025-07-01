@@ -8,7 +8,60 @@ final class WorkoutSessionViewModel: ObservableObject {
     @Published var elapsed: TimeInterval = 0
     @Published var isSessionActive: Bool = false
 
+    
+    // NEW: custom exercises
+    @Published var customExercises: [CustomExercise] = []
+
     private var timer: Timer?
+
+    init() {
+        loadCustomExercises()
+    }
+
+    func loadCustomExercises() {
+        DatabaseService.shared.fetchCustomExercises { result in
+            DispatchQueue.main.async {
+                if case let .success(list) = result {
+                    self.customExercises = list
+                }
+            }
+        }
+    }
+    
+    // Deletes from Firestore _and_ removes from the local array
+    func deleteCustomExercise(
+      _ exercise: CustomExercise,
+      completion: @escaping (Result<Void, Error>) -> Void
+    ) {
+      DatabaseService.shared.deleteCustomExercise(exercise.id) { result in
+        DispatchQueue.main.async {
+          if case .success = result {
+            self.customExercises.removeAll { $0.id == exercise.id }
+          }
+          completion(result)
+        }
+      }
+    }
+
+
+    /// Call when the user creates one
+    func createCustomExercise(
+        name: String, muscleGroups: [MuscleGroup],
+        completion: @escaping (Result<Void, Error>) -> Void
+    ) {
+        let ex = CustomExercise(id: UUID().uuidString,
+                                name: name,
+                                muscleGroups: muscleGroups)
+        DatabaseService.shared.addCustomExercise(ex) { result in
+            DispatchQueue.main.async {
+                if case .success = result {
+                    self.customExercises.append(ex)
+                }
+                completion(result)
+            }
+        }
+    }
+
 
     /// Call when user taps “Start Workout”
     func startSession() {

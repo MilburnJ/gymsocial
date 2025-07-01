@@ -1,84 +1,80 @@
-//
-//  WorkoutDetailView.swift
-//  gymsocial
-//
-//  Created by Jakeb Milburn on 6/26/25.
-//
-
-
 // Views/WorkoutDetailView.swift
 
 import SwiftUI
 
 struct WorkoutDetailView: View {
-    let workout: WorkoutPayload
+    let post: Post
 
-    // Compute human-readable duration
+    // Formatted duration
     private var durationText: String {
-        guard let duration = workout.endTime.timeIntervalSinceReferenceDate > workout.startTime.timeIntervalSinceReferenceDate
-                ? workout.endTime.timeIntervalSince(workout.startTime)
-                : nil
+        guard let end = post.workout.endTime.timeIntervalSinceReferenceDate > post.workout.startTime.timeIntervalSinceReferenceDate
+              ? post.workout.endTime.timeIntervalSince(post.workout.startTime)
+              : nil
         else { return "--:--:--" }
         return Duration
-            .seconds(duration)
+            .seconds(end)
             .formatted(.time(pattern: .hourMinuteSecond))
     }
 
-    // Format the date of the workout
+    // Formatted date
     private var dateText: String {
-        workout.startTime.formatted(.dateTime.month().day().year().hour().minute())
+        post.workout.startTime.formatted(
+            .dateTime.month().day().year().hour().minute()
+        )
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                // Header: date & duration
+                // Title
+                Text(post.title)
+                    .font(.title2).bold()
+
+                // Description
+                if let desc = post.description, !desc.isEmpty {
+                    Text(desc)
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                }
+
+                // Date & duration
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Date")
+                    Text(dateText)
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Text(dateText)
-                        .font(.headline)
                     Text("Duration: \(durationText)")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
-                .padding(.horizontal)
 
                 Divider()
 
-                // Exercises and their sets
-                ForEach(workout.exercises) { exercise in
+                // Exercises & sets
+                ForEach(post.workout.exercises) { exercise in
                     VStack(alignment: .leading, spacing: 8) {
                         Text(exercise.name)
-                            .font(.title3)
-                            .bold()
-                            .padding(.bottom, 4)
+                            .font(.headline)
 
                         ForEach(exercise.sets.indices, id: \.self) { idx in
                             let set = exercise.sets[idx]
                             HStack {
                                 Text("Set \(idx+1):")
-                                    .font(.subheadline)
                                 Spacer()
-                                let weightString = String(format: "%.1f", set.weight)
-                                Text("Set \(idx + 1): \(set.reps)x\(weightString) lb")
-                                    .font(.subheadline)
+                                Text("\(set.reps) reps  •  \(set.weight, specifier: "%.1f") lb")
                             }
-                            .padding(.horizontal)
+                            .font(.subheadline)
                         }
                     }
-                    .padding(.vertical, 8)
+                    .padding()
                     .background(Color(UIColor.secondarySystemBackground))
                     .cornerRadius(8)
-                    .padding(.horizontal)
                 }
 
                 Spacer(minLength: 20)
             }
-            .padding(.top)
+            .padding()
         }
-        .navigationTitle("Workout Detail")
+        .navigationTitle("Workout")
         .navigationBarTitleDisplayMode(.inline)
     }
 }
@@ -87,21 +83,28 @@ struct WorkoutDetailView: View {
 struct WorkoutDetailView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
-            WorkoutDetailView(
-                workout: WorkoutPayload(
-                    startTime: Date().addingTimeInterval(-3600),
-                    endTime:   Date(),
-                    exercises: [
-                        ExerciseLog(name: "Bench Press", sets: [
-                            WorkoutSet(reps: 5, weight: 135),
-                            WorkoutSet(reps: 5, weight: 140),
-                            WorkoutSet(reps: 3, weight: 145)
-                        ]),
-                        ExerciseLog(name: "Squat", sets: [
-                            WorkoutSet(reps: 5, weight: 225),
-                            WorkoutSet(reps: 5, weight: 230)
-                        ])
-                    ]
+            WorkoutDetailView(post:
+                Post(
+                    id: "1",
+                    authorID: "u1",
+                    authorName: "Jane",
+                    timestamp: Date(),
+                    likes: 0,
+                    title: "Leg Day Blast",
+                    description: "Felt strong today, nailed my squat PR!",
+                    workout: WorkoutPayload(
+                        startTime: Date().addingTimeInterval(-3600),
+                        endTime: Date(),
+                        exercises: [
+                            ExerciseLog(name: "Squat", sets: [
+                                WorkoutSet(reps: 5, weight: 200),
+                                WorkoutSet(reps: 5, weight: 205)
+                            ]),
+                            ExerciseLog(name: "Leg Press", sets: [
+                                WorkoutSet(reps: 10, weight: 300)
+                            ])
+                        ]
+                    )
                 )
             )
         }

@@ -1,14 +1,18 @@
+// Services/DatabaseService+Workout.swift
+
 import Foundation
+import FirebaseAuth
 import FirebaseFirestore
-import FirebaseAuth  // needed for Auth.auth()
 
 extension DatabaseService {
-    /// Creates a workout‐type post in /posts
+    /// Creates a workout‐type post in /posts with a title & optional description
     func createWorkoutPost(
         draft: DraftWorkout,
+        title: String,
+        description: String?,
         completion: @escaping (Result<Void, Error>) -> Void
     ) {
-        // 1. Build the nested workout payload
+        // 1) Build nested workout payload
         let workoutPayload: [String: Any] = [
             "startTime": draft.startTime,
             "endTime":   draft.endTime as Any,
@@ -22,25 +26,30 @@ extension DatabaseService {
             }
         ]
 
-        // 2. Assemble top‐level post data
-        let data: [String: Any] = [
+        // 2) Assemble post data
+        var data: [String: Any] = [
             "type":       "workout",
             "authorID":   draft.userId,
-            "authorName": Auth.auth().currentUser?.displayName ?? "",
+            "authorName": Auth.auth().currentUser?.displayName ?? "Unknown",
             "timestamp":  FieldValue.serverTimestamp(),
             "likes":      0,
+            "title":      title,
             "workout":    workoutPayload
         ]
-
-        // 3. Write to Firestore
-        let db = Firestore.firestore()
-        db.collection("posts")
-          .addDocument(data: data) { error in
-            if let error = error {
-                completion(.failure(error))
-            } else {
-                completion(.success(()))
-            }
+        if let desc = description, !desc.isEmpty {
+            data["description"] = desc
         }
+
+        // 3) Write to Firestore
+        Firestore
+            .firestore()
+            .collection("posts")
+            .addDocument(data: data) { error in
+                if let error = error {
+                    completion(.failure(error))
+                } else {
+                    completion(.success(()))
+                }
+            }
     }
 }

@@ -7,83 +7,80 @@ final class FeedViewModel: ObservableObject {
     @Published var posts: [Post] = []
     private var listener: ListenerRegistration?
 
-    init() { subscribe() }
-    deinit { listener?.remove() }
-
-    /// Call this in a .refreshable to re-query the feed
     func reload() {
         listener?.remove()
         subscribe()
     }
 
+    init() { subscribe() }
+    deinit { listener?.remove() }
+
     private func subscribe() {
-        listener = Firestore.firestore()
+        listener = Firestore
+            .firestore()
             .collection("posts")
             .whereField("type", isEqualTo: "workout")
             .order(by: "timestamp", descending: true)
-            .addSnapshotListener { [weak self] snapshot, error in
-                guard let documents = snapshot?.documents else { return }
+            .addSnapshotListener { [weak self] snap, _ in
+                guard let docs = snap?.documents else { return }
 
-                // Decode each document into a Post, dropping any that fail
-                let decoded: [Post] = documents.compactMap { doc in
-                    let data = doc.data()
+                let decoded: [Post] = docs.compactMap { doc in
+                    let d = doc.data()
 
-                    // 1) Common Post fields
+                    // required fields
                     guard
-                        let authorID   = data["authorID"]   as? String,
-                        let authorName = data["authorName"] as? String,
-                        let ts         = data["timestamp"]  as? Timestamp,
-                        let likes      = data["likes"]      as? Int,
-                        let workoutMap = data["workout"]    as? [String:Any]
+                        let authorID   = d["authorID"]   as? String,
+                        let authorName = d["authorName"] as? String,
+                        let ts         = d["timestamp"]  as? Timestamp,
+                        let likes      = d["likes"]      as? Int,
+                        let title      = d["title"]      as? String,
+                        // description is optional
+                        let workoutMap = d["workout"]    as? [String:Any]
                     else {
                         return nil
                     }
-                    let postID    = doc.documentID
-                    let timestamp = ts.dateValue()
 
-                    // 2) Workout payload fields
+                    // decode workout payload
                     guard
-                        let startTS      = workoutMap["startTime"] as? Timestamp,
-                        let endTS        = workoutMap["endTime"]   as? Timestamp,
+                        let startTS      = workoutMap["startTime"]  as? Timestamp,
+                        let endTS        = workoutMap["endTime"]    as? Timestamp,
                         let exercisesArr = workoutMap["exercises"] as? [[String:Any]]
                     else {
                         return nil
                     }
 
-                    // 3) Decode each ExerciseLog, dropping any bad entries
                     let exercises: [ExerciseLog] = exercisesArr.compactMap { exDict in
                         guard
                             let name    = exDict["name"] as? String,
                             let setsArr = exDict["sets"] as? [[String:Any]]
-                        else {
-                            return nil
-                        }
-                        // Decode each WorkoutSet, dropping invalid ones
-                        let sets: [WorkoutSet] = setsArr.compactMap { setDict in
+                        else { return nil }
+                        let sets: [WorkoutSet] = setsArr.compactMap { s in
                             guard
-                                let reps   = setDict["reps"]   as? Int,
-                                let weight = setDict["weight"] as? Double
-                            else {
-                                return nil
-                            }
+                                let reps   = s["reps"]   as? Int,
+                                let weight = s["weight"] as? Double
+                            else { return nil }
                             return WorkoutSet(reps: reps, weight: weight)
                         }
                         return ExerciseLog(name: name, sets: sets)
                     }
 
-                    // 4) Build the WorkoutPayload & Post
                     let payload = WorkoutPayload(
                         startTime: startTS.dateValue(),
                         endTime:   endTS.dateValue(),
                         exercises: exercises
                     )
 
+                    // pull optional description
+                    let desc = d["description"] as? String
+
                     return Post(
-                        id:           postID,
+                        id:           doc.documentID,
                         authorID:     authorID,
                         authorName:   authorName,
-                        timestamp:    timestamp,
+                        timestamp:    ts.dateValue(),
                         likes:        likes,
+                        title:        title,
+                        description:  desc,
                         workout:      payload
                     )
                 }

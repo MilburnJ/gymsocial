@@ -20,10 +20,12 @@ struct WorkoutPayload: Codable {
 
 /// A feed post (now _only_ workouts)
 struct Post: Identifiable {
-    let id: String
-    let authorID: String
-    let authorName: String
-    let timestamp: Date
-    let likes: Int
-    let workout: WorkoutPayload
+  let id: String
+  let authorID: String
+  let authorName: String
+  let timestamp: Date
+  let likes: Int
+  let title: String           // new
+  let description: String?    // new, optional
+  let workout: WorkoutPayload
 }

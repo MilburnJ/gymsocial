@@ -1,14 +1,15 @@
-// ExerciseLoggingView.swift
+// Views/ExerciseLoggingView.swift
+
 import SwiftUI
 
-// Allow Int to be used with .sheet(item:)
-extension Int: Identifiable {
-    public var id: Int { self }
+extension Notification.Name {
+    /// Posted when the user finishes logging an exercise
+    static let didFinishLoggingExercise = Notification.Name("didFinishLoggingExercise")
 }
 
 struct ExerciseLoggingView: View {
     @EnvironmentObject var workoutVM: WorkoutSessionViewModel
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.presentationMode) private var presentationMode
 
     @State private var log: ExerciseLog
     private let index: Int?
@@ -16,47 +17,39 @@ struct ExerciseLoggingView: View {
     @State private var currentReps: Int
     @State private var currentWeight: Double
 
-    // Which set (if any) is being edited
-    @State private var editingSetIndex: Int?
-
     init(log: ExerciseLog, index: Int?) {
         self.index = index
         _log = State(initialValue: log)
         let last = log.sets.last ?? WorkoutSet(reps: 5, weight: 135)
-        _currentReps = State(initialValue: last.reps)
+        _currentReps   = State(initialValue: last.reps)
         _currentWeight = State(initialValue: last.weight)
     }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                // Title
                 Text(log.name)
                     .font(.title2).bold()
                     .padding(.top)
 
-                // — Past Sets (discrete rows) —
+                // Past sets
                 if !log.sets.isEmpty {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Past Sets").font(.headline)
                         ForEach(log.sets.indices, id: \.self) { idx in
                             HStack {
-                                Text("Set \(idx+1): \(log.sets[idx].reps)x"
-                                     + String(format: "%.1f", log.sets[idx].weight))
+                                Text("Set \(idx+1):")
                                 Spacer()
-                                Button("Edit") {
-                                    editingSetIndex = idx
-                                }
+                                Text("\(log.sets[idx].reps)x\(log.sets[idx].weight, specifier: "%.1f")")
                             }
                             .padding(.horizontal)
                         }
                     }
-                    .padding(.horizontal)
                 }
 
                 Divider().padding(.vertical)
 
-                // — Next-Set Controls —
+                // Next-set controls
                 Text("Set \(log.sets.count + 1)")
                     .font(.headline)
 
@@ -70,7 +63,6 @@ struct ExerciseLoggingView: View {
                     Button("Complete Set") {
                         let newSet = WorkoutSet(reps: currentReps, weight: currentWeight)
                         log.sets.append(newSet)
-                        // default controls to the new last set
                         currentReps   = newSet.reps
                         currentWeight = newSet.weight
                     }
@@ -79,14 +71,19 @@ struct ExerciseLoggingView: View {
                     Spacer()
 
                     Button("Done") {
+                        // 1) Save or overwrite in the session
                         if let i = index {
                             workoutVM.draft.exercises[i] = log
                         } else {
                             workoutVM.addCompletedExercise(log)
                         }
-                        // pop back two levels
-                        dismiss()
-                        DispatchQueue.main.async { dismiss() }
+                        // 2) Dismiss this logging view
+                        presentationMode.wrappedValue.dismiss()
+                        // 3) Tell the exercise-list to pop itself too
+                        NotificationCenter.default.post(
+                            name: .didFinishLoggingExercise,
+                            object: nil
+                        )
                     }
                     .disabled(log.sets.isEmpty)
                 }
@@ -94,46 +91,22 @@ struct ExerciseLoggingView: View {
 
                 Spacer(minLength: 20)
             }
+            .padding(.horizontal)
         }
         .navigationTitle("Log \(log.name)")
-        // — Edit sheet for a single set —
-        .sheet(item: $editingSetIndex) { idx in
-            EditSetView(
-                reps: Binding(
-                    get: { log.sets[idx].reps },
-                    set: { log.sets[idx].reps = $0 }
-                ),
-                weight: Binding(
-                    get: { log.sets[idx].weight },
-                    set: { log.sets[idx].weight = $0 }
-                )
-            )
-        }
     }
 }
 
-/// A small sheet to edit one set’s reps & weight
-struct EditSetView: View {
-    @Binding var reps: Int
-    @Binding var weight: Double
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
+#if DEBUG
+struct ExerciseLoggingView_Previews: PreviewProvider {
+    static var previews: some View {
         NavigationStack {
-            Form {
-                Section("Reps") {
-                    Stepper("\(reps) reps", value: $reps, in: 1...50)
-                }
-                Section("Weight") {
-                    WeightSlider(weight: $weight)
-                }
-            }
-            .navigationTitle("Edit Set")
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
+            ExerciseLoggingView(
+                log: ExerciseLog(name: "Squat", sets: []),
+                index: nil
+            )
+            .environmentObject(WorkoutSessionViewModel())
         }
     }
 }
+#endif

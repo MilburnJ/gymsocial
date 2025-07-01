@@ -9,8 +9,8 @@ struct FeedView: View {
         NavigationView {
             ScrollView {
                 LazyVStack(spacing: 16) {
-                    ForEach(vm.posts) { post in
-                        NavigationLink(destination: WorkoutDetailView(workout: post.workout)) {
+                    ForEach(vm.posts, id: \.id) { post in
+                        NavigationLink(destination: WorkoutDetailView(post: post)) {
                             WorkoutRow(post: post)
                         }
                         .buttonStyle(PlainButtonStyle())
@@ -19,9 +19,7 @@ struct FeedView: View {
                 .padding()
             }
             .navigationTitle("Feed")
-            .refreshable {
-                vm.reload()
-            }
+            .refreshable { vm.reload() }
         }
     }
 }
@@ -30,17 +28,30 @@ private struct WorkoutRow: View {
     let post: Post
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("\(post.authorName) logged a workout")
+        VStack(alignment: .leading, spacing: 8) {
+            Text(post.title)
                 .font(.headline)
-            Text(post.workout.summary)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
+
+            if let desc = post.description, !desc.isEmpty {
+                Text(desc)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+
+            HStack {
+                Text("\(post.authorName) logged a workout")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text(post.workout.summary.components(separatedBy: "\n").first ?? "")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
         }
         .padding()
         .background(Color(UIColor.systemBackground))
         .cornerRadius(8)
-        .shadow(color: Color.black.opacity(0.05), radius: 2)
+        .shadow(color: .black.opacity(0.05), radius: 2)
     }
 }
 

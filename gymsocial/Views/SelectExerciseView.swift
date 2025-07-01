@@ -1,10 +1,14 @@
+// Views/SelectExerciseView.swift
+
 import SwiftUI
 
 struct SelectExerciseView: View {
     @EnvironmentObject var workoutVM: WorkoutSessionViewModel
+    @Environment(\.presentationMode) private var presentationMode
+
     let muscleGroup: MuscleGroup
 
-    // Only show exercises for the chosen muscle group
+    // Filter exercises by the chosen muscle group
     private var exercises: [Exercise] {
         Exercise.all.filter { $0.muscleGroup == muscleGroup }
     }
@@ -12,7 +16,6 @@ struct SelectExerciseView: View {
     var body: some View {
         List(exercises) { exercise in
             NavigationLink {
-                // Create a brand-new ExerciseLog (no sets yet) and pass index = nil
                 ExerciseLoggingView(
                     log: ExerciseLog(name: exercise.name, sets: []),
                     index: nil
@@ -23,6 +26,14 @@ struct SelectExerciseView: View {
             }
         }
         .navigationTitle(muscleGroup.displayName)
+        // Listen for the “done logging” notification and dismiss
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: .didFinishLoggingExercise
+            )
+        ) { _ in
+            presentationMode.wrappedValue.dismiss()
+        }
     }
 }
 

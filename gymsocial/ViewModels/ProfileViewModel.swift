@@ -1,46 +1,43 @@
-// ViewModels/FeedViewModel.swift
+// ViewModels/ProfileViewModel.swift
 
 import Foundation
 import FirebaseFirestore
 
-final class FeedViewModel: ObservableObject {
-    @Published var posts: [Post] = []
+final class ProfileViewModel: ObservableObject {
+    @Published var workouts: [Post] = []
     private var listener: ListenerRegistration?
 
-    func reload() {
+    /// Call this with the signed-in user’s UID to begin listening
+    func subscribe(userId: String) {
+        // Tear down any existing listener
         listener?.remove()
-        subscribe()
-    }
 
-    init() { subscribe() }
-    deinit { listener?.remove() }
-
-    private func subscribe() {
-        listener = Firestore
-            .firestore()
+        listener = Firestore.firestore()
             .collection("posts")
-            .whereField("type", isEqualTo: "workout")
+            .whereField("type",      isEqualTo: "workout")
+            .whereField("authorID",  isEqualTo: userId)
             .order(by: "timestamp", descending: true)
-            .addSnapshotListener { [weak self] snap, _ in
-                guard let docs = snap?.documents else { return }
+            .addSnapshotListener { [weak self] snapshot, _ in
+                guard let docs = snapshot?.documents else { return }
 
-                let decoded: [Post] = docs.compactMap { doc in
-                    let d = doc.data()
+                // Use compactMap so we can return nil for any malformed docs
+                let posts = docs.compactMap { doc -> Post? in
+                    let data = doc.data()
 
-                    // required fields
+                    // 1) Common Post fields
                     guard
-                        let authorID   = d["authorID"]   as? String,
-                        let authorName = d["authorName"] as? String,
-                        let ts         = d["timestamp"]  as? Timestamp,
-                        let likes      = d["likes"]      as? Int,
-                        let title      = d["title"]      as? String,
+                        let authorID   = data["authorID"]   as? String,
+                        let authorName = data["authorName"] as? String,
+                        let ts         = data["timestamp"]  as? Timestamp,
+                        let likes      = data["likes"]      as? Int,
+                        let title      = data["title"]      as? String,
                         // description is optional
-                        let workoutMap = d["workout"]    as? [String:Any]
+                        let workoutMap = data["workout"]    as? [String:Any]
                     else {
                         return nil
                     }
 
-                    // decode workout payload
+                    // 2) Workout payload fields
                     guard
                         let startTS      = workoutMap["startTime"]  as? Timestamp,
                         let endTS        = workoutMap["endTime"]    as? Timestamp,
@@ -49,29 +46,32 @@ final class FeedViewModel: ObservableObject {
                         return nil
                     }
 
+                    // 3) Decode each ExerciseLog, dropping any bad entries
                     let exercises: [ExerciseLog] = exercisesArr.compactMap { exDict in
                         guard
                             let name    = exDict["name"] as? String,
                             let setsArr = exDict["sets"] as? [[String:Any]]
                         else { return nil }
-                        let sets: [WorkoutSet] = setsArr.compactMap { s in
+
+                        let sets: [WorkoutSet] = setsArr.compactMap { setDict in
                             guard
-                                let reps   = s["reps"]   as? Int,
-                                let weight = s["weight"] as? Double
+                                let reps   = setDict["reps"]   as? Int,
+                                let weight = setDict["weight"] as? Double
                             else { return nil }
                             return WorkoutSet(reps: reps, weight: weight)
                         }
+
                         return ExerciseLog(name: name, sets: sets)
                     }
 
+                    // 4) Build WorkoutPayload & Post
                     let payload = WorkoutPayload(
                         startTime: startTS.dateValue(),
                         endTime:   endTS.dateValue(),
                         exercises: exercises
                     )
 
-                    // pull optional description
-                    let desc = d["description"] as? String
+                    let description = data["description"] as? String
 
                     return Post(
                         id:           doc.documentID,
@@ -80,14 +80,18 @@ final class FeedViewModel: ObservableObject {
                         timestamp:    ts.dateValue(),
                         likes:        likes,
                         title:        title,
-                        description:  desc,
+                        description:  description,
                         workout:      payload
                     )
                 }
 
                 DispatchQueue.main.async {
-                    self?.posts = decoded
+                    self?.workouts = posts
                 }
             }
+    }
+
+    deinit {
+        listener?.remove()
     }
 }

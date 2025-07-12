@@ -19,18 +19,21 @@ struct gymsocialApp: App {
         FirebaseApp.configure()
         Analytics.logEvent(AnalyticsEventAppOpen, parameters: nil)
     }
-    
-    @StateObject private var session = SessionViewModel()
-    var body: some Scene {
-        WindowGroup {
-            Group{
-                if session.currentUser == nil {
-                    LoginView()
-                } else {
-                    MainTabView()
-                      .environmentObject(session)
+        // 1) One single SessionViewModel for the entire app
+        @StateObject private var session = SessionViewModel()
+
+        var body: some Scene {
+            WindowGroup {
+                // 2) Switch between LoginView and MainTabView based on currentUser
+                Group {
+                    if session.currentUser == nil {
+                        LoginView()
+                    } else {
+                        MainTabView()
+                    }
                 }
+                // 3) Inject session into every child, including LoginView!
+                .environmentObject(session)
             }
         }
     }
-}

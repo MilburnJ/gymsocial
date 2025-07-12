@@ -1,37 +1,44 @@
-//
-//  MainTabView.swift
-//  gymsocial
-//
-//  Created by Jakeb Milburn on 6/25/25.
-//
-
-
 import SwiftUI
 
 struct MainTabView: View {
+    @EnvironmentObject var session: SessionViewModel
+    @StateObject private var workoutVM = WorkoutSessionViewModel()
+
     var body: some View {
         TabView {
-            FeedView()
-                .tabItem {
-                    Label("Feed", systemImage: "house")
-                }
+            NavigationStack {
+                FeedView()
+            }
+            .tabItem {
+                Label("Feed", systemImage: "house")
+            }
 
-            CreatePostView()
-                .tabItem {
-                    Label("New Post", systemImage: "plus.square")
-                }
+            NavigationStack {
+                WorkoutSessionView()
+            }
+            .environmentObject(session)
+            .environmentObject(workoutVM)
+            .tabItem {
+                Label("Workout", systemImage: "play.circle")
+            }
 
-            ProfileView()
-                .tabItem {
-                    Label("Profile", systemImage: "person.circle")
-                }
+            NavigationStack {
+                ProfileView()
+            }
+            .environmentObject(session)
+            .tabItem {
+                Label("Profile", systemImage: "person.circle")
+            }
         }
+        .environmentObject(session)
     }
 }
 
+#if DEBUG
 struct MainTabView_Previews: PreviewProvider {
     static var previews: some View {
         MainTabView()
             .environmentObject(SessionViewModel())
     }
 }
+#endif

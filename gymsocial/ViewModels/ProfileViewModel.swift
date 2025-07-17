@@ -5,37 +5,38 @@ import FirebaseFirestore
 
 final class ProfileViewModel: ObservableObject {
     @Published var workouts: [Post] = []
+    @Published var recentHighlighted: Set<MuscleGroup> = []
+
     private var listener: ListenerRegistration?
 
-    /// Call this with the signed-in user’s UID to begin listening
+    /// Call this with the signed‐in user’s UID to begin listening
     func subscribe(userId: String) {
-        // Tear down any existing listener
         listener?.remove()
-
         listener = Firestore.firestore()
             .collection("posts")
-            .whereField("type",      isEqualTo: "workout")
-            .whereField("authorID",  isEqualTo: userId)
+            .whereField("type",     isEqualTo: "workout")
+            .whereField("authorID", isEqualTo: userId)
             .order(by: "timestamp", descending: true)
             .addSnapshotListener { [weak self] snapshot, _ in
                 guard let docs = snapshot?.documents else { return }
 
-                // Use compactMap so we can return nil for any malformed docs
-                let posts = docs.compactMap { doc -> Post? in
+                var loadedPosts: [Post] = []
+
+                for doc in docs {
                     let data = doc.data()
 
-                    // 1) Common Post fields
+                    // 1) Top‐level fields
                     guard
                         let authorID   = data["authorID"]   as? String,
                         let authorName = data["authorName"] as? String,
                         let ts         = data["timestamp"]  as? Timestamp,
                         let likes      = data["likes"]      as? Int,
                         let title      = data["title"]      as? String,
-                        // description is optional
                         let workoutMap = data["workout"]    as? [String:Any]
                     else {
-                        return nil
+                        continue
                     }
+                    let description = data["description"] as? String
 
                     // 2) Workout payload fields
                     guard
@@ -43,37 +44,50 @@ final class ProfileViewModel: ObservableObject {
                         let endTS        = workoutMap["endTime"]    as? Timestamp,
                         let exercisesArr = workoutMap["exercises"] as? [[String:Any]]
                     else {
-                        return nil
+                        continue
                     }
 
-                    // 3) Decode each ExerciseLog, dropping any bad entries
-                    let exercises: [ExerciseLog] = exercisesArr.compactMap { exDict in
+                    // 3) Decode each ExerciseLog
+                    var exerciseLogs: [ExerciseLog] = []
+                    for exDict in exercisesArr {
                         guard
-                            let name    = exDict["name"] as? String,
-                            let setsArr = exDict["sets"] as? [[String:Any]]
-                        else { return nil }
-
-                        let sets: [WorkoutSet] = setsArr.compactMap { setDict in
-                            guard
-                                let reps   = setDict["reps"]   as? Int,
-                                let weight = setDict["weight"] as? Double
-                            else { return nil }
-                            return WorkoutSet(reps: reps, weight: weight)
+                            let name         = exDict["name"]         as? String,
+                            let groupStrings = exDict["muscleGroups"] as? [String],
+                            let setsArr      = exDict["sets"]         as? [[String:Any]]
+                        else {
+                            continue
                         }
 
-                        return ExerciseLog(name: name, sets: sets)
+                        // decode muscle groups
+                        let groups = groupStrings.compactMap {
+                            MuscleGroup(rawValue: $0)
+                        }
+
+                        // decode sets
+                        var sets: [WorkoutSet] = []
+                        for setDict in setsArr {
+                            if let reps   = setDict["reps"]   as? Int,
+                               let weight = setDict["weight"] as? Double {
+                                sets.append(WorkoutSet(reps: reps, weight: weight))
+                            }
+                        }
+
+                        let log = ExerciseLog(
+                            name: name,
+                            sets: sets,
+                            muscleGroups: groups,
+                        )
+                        exerciseLogs.append(log)
                     }
 
-                    // 4) Build WorkoutPayload & Post
+                    // 4) Build payload & Post
                     let payload = WorkoutPayload(
                         startTime: startTS.dateValue(),
                         endTime:   endTS.dateValue(),
-                        exercises: exercises
+                        exercises: exerciseLogs
                     )
 
-                    let description = data["description"] as? String
-
-                    return Post(
+                    let post = Post(
                         id:           doc.documentID,
                         authorID:     authorID,
                         authorName:   authorName,
@@ -83,10 +97,25 @@ final class ProfileViewModel: ObservableObject {
                         description:  description,
                         workout:      payload
                     )
+                    loadedPosts.append(post)
                 }
 
+                // 5) Compute recentHighlighted (last 48h)
+                let cutoff = Date().addingTimeInterval(-48*3600)
+                var recentGroups: [MuscleGroup] = []
+                for post in loadedPosts {
+                    if post.timestamp >= cutoff {
+                        for log in post.workout.exercises {
+                            recentGroups.append(contentsOf: log.muscleGroups)
+                        }
+                    }
+                }
+                let unique = Set(recentGroups)
+
+                // 6) Publish results
                 DispatchQueue.main.async {
-                    self?.workouts = posts
+                    self?.workouts = loadedPosts
+                    self?.recentHighlighted = unique
                 }
             }
     }

@@ -13,4 +13,6 @@ struct ExerciseLog: Identifiable, Codable {
     let id = UUID()
     var name: String
     var sets: [WorkoutSet]
+    let muscleGroups: [MuscleGroup]
+
 }

@@ -1,5 +1,3 @@
-// Views/FeedView.swift
-
 import SwiftUI
 
 struct FeedView: View {
@@ -27,25 +25,41 @@ struct FeedView: View {
 private struct WorkoutRow: View {
     let post: Post
 
+    /// All the muscle groups this workout hit
+    private var muscleHighlights: Set<MuscleGroup> {
+        Set(post.workout.exercises.flatMap { $0.muscleGroups })
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            // Title & optional description
             Text(post.title)
                 .font(.headline)
-
             if let desc = post.description, !desc.isEmpty {
                 Text(desc)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }
 
+            // Here’s the fluid diagram:
+            MuscleDiagramView(highlight: muscleHighlights)
+                .scaledToFit()              // scale front+back together
+                .frame(maxWidth: .infinity) // fill the row’s width
+                .frame(maxHeight: 400)      // cap its height at 400pts
+                .clipped()                  // just in case
+
+            // Author + workout summary
             HStack {
                 Text("\(post.authorName) logged a workout")
                     .font(.caption)
                     .foregroundColor(.secondary)
                 Spacer()
-                Text(post.workout.summary.components(separatedBy: "\n").first ?? "")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
+                Text(post.workout.summary
+                        .components(separatedBy: "\n")
+                        .first ?? ""
+                )
+                .font(.caption2)
+                .foregroundColor(.secondary)
             }
         }
         .padding()

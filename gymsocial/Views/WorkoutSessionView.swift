@@ -23,7 +23,8 @@ struct WorkoutSessionView: View {
         Duration.seconds(vm.elapsed)
           .formatted(.time(pattern: .hourMinuteSecond))
     }
-
+    
+    
     var body: some View {
         VStack(spacing: 16) {
             if !sessionActive {
@@ -40,6 +41,9 @@ struct WorkoutSessionView: View {
                 Text(elapsedText)
                     .font(.largeTitle).bold()
                     .padding(.top)
+                
+                MuscleDiagramView(highlight: vm.highlightedGroups)
+                    .frame(height: 220)
 
                 // Muscle-group carousel
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -91,17 +95,20 @@ struct WorkoutSessionView: View {
                             ForEach(globalFilteredExercises, id: \.self) { name in
                                 NavigationLink {
                                     ExerciseLoggingView(
-                                        log: ExerciseLog(name: name, sets: []),
+                                        log: createExerciseLog(for: name, vm: vm),
                                         index: nil
                                     )
                                     .environmentObject(vm)
                                 } label: {
-                                    Text(name)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .padding(.vertical, 8)
-                                        .padding(.horizontal)
-                                        .background(Color(UIColor.secondarySystemBackground))
-                                        .cornerRadius(8)
+                                    HStack {
+                                        Text(name)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                        Spacer()
+                                    }
+                                    .padding(.vertical, 8)
+                                    .padding(.horizontal)
+                                    .background(Color(UIColor.secondarySystemBackground))
+                                    .cornerRadius(8)
                                 }
                                 .simultaneousGesture(TapGesture().onEnded {
                                     globalSearch = ""
@@ -165,9 +172,24 @@ struct WorkoutSessionView: View {
                 sessionActive = false
             }
         }
+        
     }
 }
 
+private func createExerciseLog(for name: String, vm: WorkoutSessionViewModel) -> ExerciseLog {
+    // First check built-in exercises
+    if let builtIn = Exercise.all.first(where: { $0.name == name }) {
+        return ExerciseLog(name: name, sets: [], muscleGroups: builtIn.muscleGroups)
+    }
+    
+    // Then check custom exercises
+    if let custom = vm.customExercises.first(where: { $0.name == name }) {
+        return ExerciseLog(name: name, sets: [], muscleGroups: custom.muscleGroups)
+    }
+    
+    // Fallback (shouldn't happen)
+    return ExerciseLog(name: name, sets: [], muscleGroups: [])
+}
 private struct CompletedExerciseRow: View {
     let log: ExerciseLog
 

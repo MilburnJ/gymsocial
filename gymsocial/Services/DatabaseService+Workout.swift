@@ -12,13 +12,14 @@ extension DatabaseService {
         description: String?,
         completion: @escaping (Result<Void, Error>) -> Void
     ) {
-        // 1) Build nested workout payload
+        // 1) Build nested workout payload, now including muscleGroups
         let workoutPayload: [String: Any] = [
             "startTime": draft.startTime,
             "endTime":   draft.endTime as Any,
             "exercises": draft.exercises.map { log in
                 [
                     "name": log.name,
+                    "muscleGroups": log.muscleGroups.map { $0.rawValue },  // ← added
                     "sets": log.sets.map { set in
                         ["reps": set.reps, "weight": set.weight]
                     }

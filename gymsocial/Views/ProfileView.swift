@@ -1,6 +1,7 @@
 // Views/ProfileView.swift
 
 import SwiftUI
+import FirebaseAuth
 
 struct ProfileView: View {
     @EnvironmentObject var session: SessionViewModel
@@ -9,7 +10,7 @@ struct ProfileView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 16) {
-                // MARK: — Profile Header
+                // — Profile Header —
                 if let user = session.currentUser {
                     Text(user.displayName)
                         .font(.title2).bold()
@@ -20,13 +21,17 @@ struct ProfileView: View {
                         .foregroundColor(.secondary)
                 }
 
+                // — Muscle Diagram (last-48h highlights) —
+                MuscleDiagramView(highlight: vm.recentHighlighted)
+                    .frame(height: 220)
+
                 Divider()
 
-                // MARK: — Workout History
+                // — Workout History —
                 if vm.workouts.isEmpty {
                     Text("No workouts logged yet")
-                        .italic()
                         .foregroundColor(.secondary)
+                        .italic()
                 } else {
                     List(vm.workouts) { post in
                         NavigationLink(destination: WorkoutDetailView(post: post)) {
@@ -38,10 +43,9 @@ struct ProfileView: View {
 
                 Spacer()
 
-                // MARK: — Sign Out
+                // — Sign Out —
                 Button("Sign Out") {
-                    do { try AuthService.shared.signOut() }
-                    catch { print("Sign out failed:", error) }
+                    try? AuthService.shared.signOut()
                 }
                 .foregroundColor(.red)
                 .padding(.vertical, 8)
@@ -66,18 +70,13 @@ private struct ProfileWorkoutRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // Title
             Text(post.title)
                 .font(.headline)
-
-            // Optional description
             if let desc = post.description, !desc.isEmpty {
                 Text(desc)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }
-
-            // Date and first-exercise summary
             HStack {
                 Text(dateText)
                     .font(.caption)

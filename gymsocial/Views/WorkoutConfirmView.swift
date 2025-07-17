@@ -65,6 +65,7 @@ struct WorkoutConfirmView: View {
                 isPosting = false
                 switch result {
                 case .success:
+                    NotificationCenter.default.post(name: .didFinishLoggingExercise, object: nil)
                     dismiss()  // back to “Start Workout” screen
                 case .failure(let err):
                     errorText = err.localizedDescription

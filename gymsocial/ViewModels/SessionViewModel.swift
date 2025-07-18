@@ -22,14 +22,14 @@ final class SessionViewModel: ObservableObject {
                         let id = snap.documentID
                         let displayName = data["displayName"] as? String ?? ""
                         let email = data["email"] as? String ?? ""
-                        let photoURL = data["profilePhotoURL"] as? String
+                        let photoURL = data["profilePhotoURL"] as? URL
                         
                         DispatchQueue.main.async {
                             self.currentUser = User(
                                 id: id,
                                 displayName: displayName,
                                 email: email,
-                                profilePhotoURL: photoURL
+                                photoURL: photoURL
                             )
                         }
                     } else {

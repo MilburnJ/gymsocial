@@ -1,24 +1,23 @@
+// Views/FeedView.swift
+
 import SwiftUI
 
 struct FeedView: View {
     @StateObject private var vm = FeedViewModel()
 
     var body: some View {
-        NavigationView {
-            ScrollView {
-                LazyVStack(spacing: 16) {
-                    ForEach(vm.posts, id: \.id) { post in
-                        NavigationLink(destination: WorkoutDetailView(post: post)) {
-                            WorkoutRow(post: post)
-                        }
-                        .buttonStyle(PlainButtonStyle())
+        ScrollView {
+            LazyVStack(spacing: 16) {
+                ForEach(vm.posts, id: \.id) { post in
+                    NavigationLink(destination: WorkoutDetailView(post: post)) {
+                        WorkoutRow(post: post)
                     }
+                    .buttonStyle(PlainButtonStyle())
                 }
-                .padding()
             }
-            .navigationTitle("Feed")
-            .refreshable { vm.reload() }
+            .padding()
         }
+        .refreshable { vm.reload() }
     }
 }
 
@@ -32,7 +31,6 @@ private struct WorkoutRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Title & optional description
             Text(post.title)
                 .font(.headline)
             if let desc = post.description, !desc.isEmpty {
@@ -41,25 +39,20 @@ private struct WorkoutRow: View {
                     .foregroundColor(.secondary)
             }
 
-            // Here’s the fluid diagram:
             MuscleDiagramView(highlight: muscleHighlights)
-                .scaledToFit()              // scale front+back together
-                .frame(maxWidth: .infinity) // fill the row’s width
-                .frame(maxHeight: 400)      // cap its height at 400pts
-                .clipped()                  // just in case
+                .scaledToFit()
+                .frame(maxWidth: .infinity)
+                .frame(maxHeight: 400)
+                .clipped()
 
-            // Author + workout summary
             HStack {
                 Text("\(post.authorName) logged a workout")
                     .font(.caption)
                     .foregroundColor(.secondary)
                 Spacer()
-                Text(post.workout.summary
-                        .components(separatedBy: "\n")
-                        .first ?? ""
-                )
-                .font(.caption2)
-                .foregroundColor(.secondary)
+                Text(post.workout.summary.components(separatedBy: "\n").first ?? "")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
             }
         }
         .padding()
@@ -72,7 +65,12 @@ private struct WorkoutRow: View {
 #if DEBUG
 struct FeedView_Previews: PreviewProvider {
     static var previews: some View {
-        FeedView()
+        NavigationStack {
+            FeedView()
+                .navigationTitle("Feed")
+                .navigationBarTitleDisplayMode(.inline)
+        }
+        .environmentObject(SessionViewModel())
     }
 }
 #endif

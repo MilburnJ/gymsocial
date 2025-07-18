@@ -1,90 +1,124 @@
 // ViewModels/ProfileViewModel.swift
 
 import Foundation
+import FirebaseAuth
 import FirebaseFirestore
+import UIKit
 
 final class ProfileViewModel: ObservableObject {
+    // MARK: - Published properties
+    @Published var user: User?
+    @Published var profileImage: UIImage?
     @Published var workouts: [Post] = []
     @Published var recentHighlighted: Set<MuscleGroup> = []
 
-    private var listener: ListenerRegistration?
+    // MARK: - Private listeners
+    private var userListener: ListenerRegistration?
+    private var workoutListener: ListenerRegistration?
 
-    /// Call this with the signed‐in user’s UID to begin listening
+    // MARK: - Subscribe to both user‐doc and workout posts
     func subscribe(userId: String) {
-        listener?.remove()
-        listener = Firestore.firestore()
+        listenToUser(userId: userId)
+        listenToWorkouts(userId: userId)
+    }
+
+    private func listenToUser(userId: String) {
+        userListener?.remove()
+        userListener = Firestore.firestore()
+            .collection("users")
+            .document(userId)
+            .addSnapshotListener { [weak self] snap, _ in
+                guard let self = self,
+                      let data = snap?.data() else { return }
+
+                // Parse user fields
+                let id = snap!.documentID
+                let displayName = data["displayName"] as? String ?? ""
+                let email       = data["email"]       as? String ?? ""
+                let urlString   = data["photoURL"]    as? String
+                let photoURL    = urlString.flatMap(URL.init)
+
+                DispatchQueue.main.async {
+                    self.user = User(
+                        id: id,
+                        displayName: displayName,
+                        email: email,
+                        photoURL: photoURL
+                    )
+                }
+
+                // Load the image if we have a URL
+                if let url = photoURL {
+                    URLSession.shared.dataTask(with: url) { data, _, _ in
+                        if let data = data, let img = UIImage(data: data) {
+                            DispatchQueue.main.async {
+                                self.profileImage = img
+                            }
+                        }
+                    }
+                    .resume()
+                }
+            }
+    }
+
+    private func listenToWorkouts(userId: String) {
+        workoutListener?.remove()
+        workoutListener = Firestore.firestore()
             .collection("posts")
             .whereField("type",     isEqualTo: "workout")
             .whereField("authorID", isEqualTo: userId)
             .order(by: "timestamp", descending: true)
-            .addSnapshotListener { [weak self] snapshot, _ in
-                guard let docs = snapshot?.documents else { return }
+            .addSnapshotListener { [weak self] snap, _ in
+                guard let self = self,
+                      let docs = snap?.documents else { return }
 
-                var loadedPosts: [Post] = []
-
+                var loaded: [Post] = []
                 for doc in docs {
-                    let data = doc.data()
-
-                    // 1) Top‐level fields
+                    let d = doc.data()
                     guard
-                        let authorID   = data["authorID"]   as? String,
-                        let authorName = data["authorName"] as? String,
-                        let ts         = data["timestamp"]  as? Timestamp,
-                        let likes      = data["likes"]      as? Int,
-                        let title      = data["title"]      as? String,
-                        let workoutMap = data["workout"]    as? [String:Any]
-                    else {
-                        continue
-                    }
-                    let description = data["description"] as? String
+                        let authorID   = d["authorID"]   as? String,
+                        let authorName = d["authorName"] as? String,
+                        let ts         = d["timestamp"]  as? Timestamp,
+                        let likes      = d["likes"]      as? Int,
+                        let title      = d["title"]      as? String,
+                        let workoutMap = d["workout"]    as? [String:Any]
+                    else { continue }
+                    let description = d["description"] as? String
 
-                    // 2) Workout payload fields
+                    // Decode workout payload
                     guard
                         let startTS      = workoutMap["startTime"]  as? Timestamp,
                         let endTS        = workoutMap["endTime"]    as? Timestamp,
                         let exercisesArr = workoutMap["exercises"] as? [[String:Any]]
-                    else {
-                        continue
-                    }
+                    else { continue }
 
-                    // 3) Decode each ExerciseLog
-                    var exerciseLogs: [ExerciseLog] = []
-                    for exDict in exercisesArr {
+                    var logs: [ExerciseLog] = []
+                    for ex in exercisesArr {
                         guard
-                            let name         = exDict["name"]         as? String,
-                            let groupStrings = exDict["muscleGroups"] as? [String],
-                            let setsArr      = exDict["sets"]         as? [[String:Any]]
-                        else {
-                            continue
-                        }
+                            let name         = ex["name"]         as? String,
+                            let groupStrings = ex["muscleGroups"] as? [String],
+                            let setsArr      = ex["sets"]         as? [[String:Any]]
+                        else { continue }
 
-                        // decode muscle groups
-                        let groups = groupStrings.compactMap {
-                            MuscleGroup(rawValue: $0)
-                        }
-
-                        // decode sets
+                        let groups = groupStrings.compactMap { MuscleGroup(rawValue: $0) }
                         var sets: [WorkoutSet] = []
-                        for setDict in setsArr {
-                            if let reps   = setDict["reps"]   as? Int,
-                               let weight = setDict["weight"] as? Double {
+                        for s in setsArr {
+                            if let reps = s["reps"] as? Int,
+                               let weight = s["weight"] as? Double {
                                 sets.append(WorkoutSet(reps: reps, weight: weight))
                             }
                         }
-
-                        let log = ExerciseLog(
-                            name: name,
-                            sets: sets,
-                            muscleGroups: groups,
-                        )
-                        exerciseLogs.append(log)
+                        logs.append(ExerciseLog(
+                            name:          name,
+                            sets:          sets,
+                            muscleGroups: groups
+                        ))
                     }
 
-                    // 4) Build payload & Post
                     let payload = WorkoutPayload(
                         startTime: startTS.dateValue(),
                         endTime:   endTS.dateValue(),
-                        exercises: exerciseLogs
+                        exercises: logs
                     )
 
                     let post = Post(
@@ -97,30 +131,44 @@ final class ProfileViewModel: ObservableObject {
                         description:  description,
                         workout:      payload
                     )
-                    loadedPosts.append(post)
+                    loaded.append(post)
                 }
 
-                // 5) Compute recentHighlighted (last 48h)
+                // Compute recent highlights (last 48h)
                 let cutoff = Date().addingTimeInterval(-48*3600)
-                var recentGroups: [MuscleGroup] = []
-                for post in loadedPosts {
-                    if post.timestamp >= cutoff {
-                        for log in post.workout.exercises {
-                            recentGroups.append(contentsOf: log.muscleGroups)
-                        }
-                    }
-                }
-                let unique = Set(recentGroups)
+                let recentGroups = loaded
+                    .filter { $0.timestamp >= cutoff }
+                    .flatMap { $0.workout.exercises.flatMap { $0.muscleGroups } }
 
-                // 6) Publish results
                 DispatchQueue.main.async {
-                    self?.workouts = loadedPosts
-                    self?.recentHighlighted = unique
+                    self.workouts         = loaded
+                    self.recentHighlighted = Set(recentGroups)
                 }
             }
     }
 
+    // MARK: - Uploading a new profile image
+    func uploadProfileImage(_ image: UIImage) {
+        DatabaseService.shared.uploadProfileImage(image) { [weak self] result in
+            switch result {
+            case .success(let url):
+                // Fetch and cache new image
+                URLSession.shared.dataTask(with: url) { data, _, _ in
+                    if let data = data, let img = UIImage(data: data) {
+                        DispatchQueue.main.async {
+                            self?.profileImage = img
+                        }
+                    }
+                }
+                .resume()
+            case .failure(let err):
+                print("Failed to upload profile image:", err)
+            }
+        }
+    }
+
     deinit {
-        listener?.remove()
+        userListener?.remove()
+        workoutListener?.remove()
     }
 }

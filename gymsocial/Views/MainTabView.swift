@@ -6,15 +6,21 @@ struct MainTabView: View {
 
     var body: some View {
         TabView {
+            // Feed Tab
             NavigationStack {
                 FeedView()
+                    .navigationTitle("Feed")
+                    .navigationBarTitleDisplayMode(.inline)
             }
             .tabItem {
                 Label("Feed", systemImage: "house")
             }
 
+            // Workout Tab
             NavigationStack {
                 WorkoutSessionView()
+                    .navigationTitle("Workout")
+                    .navigationBarTitleDisplayMode(.inline)
             }
             .environmentObject(session)
             .environmentObject(workoutVM)
@@ -22,8 +28,11 @@ struct MainTabView: View {
                 Label("Workout", systemImage: "play.circle")
             }
 
+            // Profile Tab
             NavigationStack {
                 ProfileView()
+                    .navigationTitle("Profile")                  // ← single nav title here
+                    .navigationBarTitleDisplayMode(.inline)      // ← inline style
             }
             .environmentObject(session)
             .tabItem {

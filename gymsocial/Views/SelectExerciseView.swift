@@ -5,35 +5,33 @@ import SwiftUI
 struct SelectExerciseView: View {
     @EnvironmentObject var vm: WorkoutSessionViewModel
     @Environment(\.presentationMode) private var presentationMode
-
+    
     let muscleGroup: MuscleGroup
     @State private var searchText = ""
-
+    
     // The custom exercise the user tapped “–” on
     @State private var exerciseToDelete: CustomExercise?
     // Controls showing the confirmation alert
     @State private var showDeleteAlert = false
-
-    // MARK: – Built‐in exercises in this group, filtered by searchText
+    
     private var builtIn: [Exercise] {
         Exercise.all
-            .filter { $0.muscleGroup == muscleGroup }
+            .filter { $0.muscleGroups.contains(muscleGroup) }  // Use contains() instead of ==
             .filter {
                 searchText.isEmpty ||
                 $0.name.localizedCaseInsensitiveContains(searchText)
             }
     }
-
+    
     // MARK: – The user’s custom exercises for this group, filtered
     private var custom: [CustomExercise] {
         vm.customExercises
-            .filter { $0.muscleGroups.contains(muscleGroup) }
+            .filter { $0.muscleGroups.contains(muscleGroup) }  // Remove array brackets from muscleGroup
             .filter {
                 searchText.isEmpty ||
                 $0.name.localizedCaseInsensitiveContains(searchText)
             }
     }
-
     var body: some View {
         List {
             // 1) Search field
@@ -41,14 +39,14 @@ struct SelectExerciseView: View {
                 TextField("Search \(muscleGroup.displayName)…", text: $searchText)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
             }
-
+            
             // 2) All exercises
             Section("Exercises") {
                 // – built-in
-                ForEach(builtIn) { ex in
+                ForEach(Array(builtIn), id: \.name) { ex in
                     NavigationLink {
                         ExerciseLoggingView(
-                            log: ExerciseLog(name: ex.name, sets: []),
+                            log: ExerciseLog(name: ex.name, sets: [], muscleGroups: ex.muscleGroups),
                             index: nil
                         )
                         .environmentObject(vm)
@@ -56,33 +54,33 @@ struct SelectExerciseView: View {
                         Text(ex.name)
                     }
                 }
-
-                // – custom (italicized + delete button)
-                ForEach(custom) { ex in
-                    HStack {
-                        NavigationLink {
-                            ExerciseLoggingView(
-                                log: ExerciseLog(name: ex.name, sets: []),
-                                index: nil
-                            )
-                            .environmentObject(vm)
-                        } label: {
-                            Text(ex.name)
-                                .italic()
-                        }
-
-                        Spacer()
-
-                        Button {
-                            // queue up this exercise for deletion
-                            exerciseToDelete = ex
-                            showDeleteAlert = true
-                        } label: {
-                            Image(systemName: "minus.circle")
-                                .foregroundColor(.red)
-                        }
-                        .buttonStyle(BorderlessButtonStyle())
+            }
+            
+            // – custom (italicized + delete button)
+            ForEach(custom) { ex in
+                HStack {
+                    NavigationLink {
+                        ExerciseLoggingView(
+                            log: ExerciseLog(name: ex.name, sets: [], muscleGroups: ex.muscleGroups),
+                            index: nil
+                        )
+                        .environmentObject(vm)
+                    } label: {
+                        Text(ex.name)
+                            .italic()
                     }
+                    
+                    Spacer()
+                    
+                    Button {
+                        // queue up this exercise for deletion
+                        exerciseToDelete = ex
+                        showDeleteAlert = true
+                    } label: {
+                        Image(systemName: "minus.circle")
+                            .foregroundColor(.red)
+                    }
+                    .buttonStyle(BorderlessButtonStyle())
                 }
             }
         }
@@ -119,7 +117,7 @@ struct SelectExerciseView: View {
 struct SelectExerciseView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
-            SelectExerciseView(muscleGroup: .legs)
+            SelectExerciseView(muscleGroup: .biceps)
                 .environmentObject(WorkoutSessionViewModel())
         }
     }

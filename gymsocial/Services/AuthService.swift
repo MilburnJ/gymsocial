@@ -62,7 +62,7 @@ final class AuthService {
                                 id: fbUser.uid,
                                 displayName: displayName,
                                 email: email,
-                                profilePhotoURL: nil
+                                photoURL: nil
                             )
                             completion(.success(user))
                         }
@@ -107,7 +107,7 @@ final class AuthService {
                         id: fbUser.uid,
                         displayName: name,
                         email: email,
-                        profilePhotoURL: nil
+                        photoURL: nil
                     )
                     completion(.success(user))
                 }

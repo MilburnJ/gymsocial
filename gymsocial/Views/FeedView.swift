@@ -6,37 +6,44 @@ struct FeedView: View {
     @StateObject private var vm = FeedViewModel()
 
     var body: some View {
-        NavigationView {
-            ScrollView {
-                LazyVStack(spacing: 16) {
-                    ForEach(vm.posts, id: \.id) { post in
-                        NavigationLink(destination: WorkoutDetailView(post: post)) {
-                            WorkoutRow(post: post)
-                        }
-                        .buttonStyle(PlainButtonStyle())
+        ScrollView {
+            LazyVStack(spacing: 16) {
+                ForEach(vm.posts, id: \.id) { post in
+                    NavigationLink(destination: WorkoutDetailView(post: post)) {
+                        WorkoutRow(post: post)
                     }
+                    .buttonStyle(PlainButtonStyle())
                 }
-                .padding()
             }
-            .navigationTitle("Feed")
-            .refreshable { vm.reload() }
+            .padding()
         }
+        .refreshable { vm.reload() }
     }
 }
 
 private struct WorkoutRow: View {
     let post: Post
 
+    /// All the muscle groups this workout hit
+    private var muscleHighlights: Set<MuscleGroup> {
+        Set(post.workout.exercises.flatMap { $0.muscleGroups })
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(post.title)
                 .font(.headline)
-
             if let desc = post.description, !desc.isEmpty {
                 Text(desc)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }
+
+            MuscleDiagramView(highlight: muscleHighlights)
+                .scaledToFit()
+                .frame(maxWidth: .infinity)
+                .frame(maxHeight: 400)
+                .clipped()
 
             HStack {
                 Text("\(post.authorName) logged a workout")
@@ -58,7 +65,12 @@ private struct WorkoutRow: View {
 #if DEBUG
 struct FeedView_Previews: PreviewProvider {
     static var previews: some View {
-        FeedView()
+        NavigationStack {
+            FeedView()
+                .navigationTitle("Feed")
+                .navigationBarTitleDisplayMode(.inline)
+        }
+        .environmentObject(SessionViewModel())
     }
 }
 #endif

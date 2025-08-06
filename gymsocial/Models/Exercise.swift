@@ -15,21 +15,21 @@ import Foundation
 struct Exercise: Identifiable, Codable, Equatable {
     let id = UUID()
     let name: String
-    let muscleGroup: MuscleGroup
+    let muscleGroups: [MuscleGroup]
 
     // Sample data; in a real app you might fetch these
     static let all: [Exercise] = [
-      .init(name: "Bench Press", muscleGroup: .chest),
-      .init(name: "Push-Up",    muscleGroup: .chest),
-      .init(name: "Pull-Up",    muscleGroup: .back),
-      .init(name: "Deadlift",   muscleGroup: .back),
-      .init(name: "Squat",      muscleGroup: .legs),
-      .init(name: "Lunge",      muscleGroup: .legs),
-      .init(name: "Shoulder Press", muscleGroup: .shoulders),
-      .init(name: "Lateral Raise",   muscleGroup: .shoulders),
-      .init(name: "Bicep Curl",      muscleGroup: .arms),
-      .init(name: "Tricep Dip",      muscleGroup: .arms),
-      .init(name: "Plank",           muscleGroup: .core),
-      .init(name: "Sit-Up",          muscleGroup: .core)
+      .init(name: "Bench Press", muscleGroups: [.chest]),
+      .init(name: "Push-Up",    muscleGroups: [.chest]),
+      .init(name: "Pull-Up",    muscleGroups: [.lats]),
+      .init(name: "Deadlift",   muscleGroups: [.hamstrings]),
+      .init(name: "Squat",      muscleGroups: [.quads]),
+      .init(name: "Lunge",      muscleGroups: [.hamstrings]),
+      .init(name: "Shoulder Press", muscleGroups: [.shoulders]),
+      .init(name: "Lateral Raise",   muscleGroups: [.shoulders]),
+      .init(name: "Bicep Curl",      muscleGroups: [.biceps]),
+      .init(name: "Tricep Dip",      muscleGroups: [.triceps]),
+      .init(name: "Plank",           muscleGroups: [.core]),
+      .init(name: "Sit-Up",          muscleGroups: [.core])
     ]
 }

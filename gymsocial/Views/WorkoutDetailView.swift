@@ -79,6 +79,7 @@ struct WorkoutDetailView: View {
     }
 }
 
+/*
 #if DEBUG
 struct WorkoutDetailView_Previews: PreviewProvider {
     static var previews: some View {
@@ -99,10 +100,10 @@ struct WorkoutDetailView_Previews: PreviewProvider {
                             ExerciseLog(name: "Squat", sets: [
                                 WorkoutSet(reps: 5, weight: 200),
                                 WorkoutSet(reps: 5, weight: 205)
-                            ]),
+                            ], muscleGroups: ["quads"]),
                             ExerciseLog(name: "Leg Press", sets: [
                                 WorkoutSet(reps: 10, weight: 300)
-                            ])
+                            ],muscleGroups: ["quads"])
                         ]
                     )
                 )
@@ -111,3 +112,4 @@ struct WorkoutDetailView_Previews: PreviewProvider {
     }
 }
 #endif
+*/

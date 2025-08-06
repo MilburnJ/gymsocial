@@ -11,6 +11,6 @@ struct User: Identifiable {
     var id: String
     var displayName: String
     var email: String
-    var profilePhotoURL: String? //Optional, will add later
+    var photoURL: URL? //Optional, will add later
     //add more fields later
 }

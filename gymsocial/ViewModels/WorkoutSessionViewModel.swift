@@ -99,6 +99,7 @@ final class WorkoutSessionViewModel: ObservableObject {
             exercises: []
         )
         elapsed = 0
+        highlightedGroups.removeAll()              
         // leave isSessionActive = false
     }
 
@@ -113,9 +114,13 @@ final class WorkoutSessionViewModel: ObservableObject {
         timer?.invalidate()
     }
 
+    @Published var highlightedGroups = Set<MuscleGroup>()
+
     func addCompletedExercise(_ log: ExerciseLog) {
         draft.exercises.append(log)
+        highlightedGroups.formUnion(log.muscleGroups)
     }
+
 
     /// Called by the confirmation screen’s “Post Workout” button
     func publishWorkout(

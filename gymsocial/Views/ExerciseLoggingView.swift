@@ -97,6 +97,7 @@ struct ExerciseLoggingView: View {
     }
 }
 
+/*
 #if DEBUG
 struct ExerciseLoggingView_Previews: PreviewProvider {
     static var previews: some View {
@@ -110,3 +111,4 @@ struct ExerciseLoggingView_Previews: PreviewProvider {
     }
 }
 #endif
+*/

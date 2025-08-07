@@ -10,16 +10,20 @@ final class ProfileViewModel: ObservableObject {
     @Published var user: User?
     @Published var profileImage: UIImage?
     @Published var workouts: [Post] = []
+    @Published var followersCount: Int = 0
+    @Published var followingCount: Int = 0
     @Published var recentHighlighted: Set<MuscleGroup> = []
 
     // MARK: - Private listeners
     private var userListener: ListenerRegistration?
     private var workoutListener: ListenerRegistration?
 
-    // MARK: - Subscribe to both user‐doc and workout posts
+    /// Subscribe to user doc, workouts, and follower/following counts.
     func subscribe(userId: String) {
         listenToUser(userId: userId)
         listenToWorkouts(userId: userId)
+        fetchFollowersCount(userId: userId)
+        fetchFollowingCount(userId: userId)
     }
 
     private func listenToUser(userId: String) {
@@ -31,7 +35,6 @@ final class ProfileViewModel: ObservableObject {
                 guard let self = self,
                       let data = snap?.data() else { return }
 
-                // Parse user fields
                 let id = snap!.documentID
                 let displayName = data["displayName"] as? String ?? ""
                 let email       = data["email"]       as? String ?? ""
@@ -47,7 +50,6 @@ final class ProfileViewModel: ObservableObject {
                     )
                 }
 
-                // Load the image if we have a URL
                 if let url = photoURL {
                     URLSession.shared.dataTask(with: url) { data, _, _ in
                         if let data = data, let img = UIImage(data: data) {
@@ -85,7 +87,6 @@ final class ProfileViewModel: ObservableObject {
                     else { continue }
                     let description = d["description"] as? String
 
-                    // Decode workout payload
                     guard
                         let startTS      = workoutMap["startTime"]  as? Timestamp,
                         let endTS        = workoutMap["endTime"]    as? Timestamp,
@@ -134,25 +135,52 @@ final class ProfileViewModel: ObservableObject {
                     loaded.append(post)
                 }
 
-                // Compute recent highlights (last 48h)
                 let cutoff = Date().addingTimeInterval(-48*3600)
                 let recentGroups = loaded
                     .filter { $0.timestamp >= cutoff }
                     .flatMap { $0.workout.exercises.flatMap { $0.muscleGroups } }
 
                 DispatchQueue.main.async {
-                    self.workouts         = loaded
+                    self.workouts          = loaded
                     self.recentHighlighted = Set(recentGroups)
                 }
             }
     }
 
+    // MARK: - Follower / Following counts
+
+    private func fetchFollowersCount(userId: String) {
+        DatabaseService.shared.fetchFollowers(for: userId) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let users):
+                    self.followersCount = users.count
+                case .failure:
+                    self.followersCount = 0
+                }
+            }
+        }
+    }
+
+    private func fetchFollowingCount(userId: String) {
+        DatabaseService.shared.fetchFollowing(for: userId) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let users):
+                    self.followingCount = users.count
+                case .failure:
+                    self.followingCount = 0
+                }
+            }
+        }
+    }
+
     // MARK: - Uploading a new profile image
+
     func uploadProfileImage(_ image: UIImage) {
-        DatabaseService.shared.uploadProfileImage(image) { [weak self] result in
+        DatabaseService.shared.uploadProfileImage(image) { [weak self] (result: Result<URL, Error>) in
             switch result {
             case .success(let url):
-                // Fetch and cache new image
                 URLSession.shared.dataTask(with: url) { data, _, _ in
                     if let data = data, let img = UIImage(data: data) {
                         DispatchQueue.main.async {

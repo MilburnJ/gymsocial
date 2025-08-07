@@ -1,5 +1,3 @@
-// Views/ProfileView.swift
-
 import SwiftUI
 import PhotosUI
 import FirebaseAuth
@@ -51,8 +49,39 @@ struct ProfileView: View {
                 Spacer()
             }
             .padding(.horizontal)
+            
+            // — Followers / Following Badges —
+            HStack(spacing: 32) {
+                let uid = vm.user?.id ?? session.currentUser?.id ?? ""
+                
+                NavigationLink(
+                    destination: UserListView(userId: uid, isFollowers: true)
+                ) {
+                    VStack {
+                        Text("\(vm.followersCount)")
+                            .font(.headline)
+                        Text("Followers")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                NavigationLink(
+                    destination: UserListView(userId: uid, isFollowers: false)
+                ) {
+                    VStack {
+                        Text("\(vm.followingCount)")
+                            .font(.headline)
+                        Text("Following")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.vertical, 8)
 
-            // — Muscle Diagram (last‑48h highlights) —
+            // — Muscle Diagram (last-48h highlights) —
             MuscleDiagramView(highlight: vm.recentHighlighted)
                 .scaledToFit()
                 .frame(maxWidth: .infinity, maxHeight: 180)

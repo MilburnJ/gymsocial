@@ -15,7 +15,14 @@ struct MainTabView: View {
             .tabItem {
                 Label("Feed", systemImage: "house")
             }
-
+                    // Search Tab 
+                    NavigationStack {
+                        SearchView()
+                    }
+                    .environmentObject(session)
+                    .tabItem {
+                        Label("Search", systemImage: "magnifyingglass")
+                   }
             // Workout Tab
             NavigationStack {
                 WorkoutSessionView()
